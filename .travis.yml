@@ -16,6 +16,7 @@ before_script:
   export PATH=$HOME/.local/bin:$PATH
 script:
 - |
+  cargo build --no-default-features &&
   cargo build &&
   cargo test &&
   travis-cargo --only nightly bench &&

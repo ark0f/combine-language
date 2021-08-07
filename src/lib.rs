@@ -34,15 +34,19 @@
 #[macro_use]
 extern crate combine;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::str;
 
+use combine::stream::StreamErrorFor;
 use combine::{
     any, attempt, between, error,
     error::{Commit, ParseResult::*, StdParseResult, StreamError, Tracked},
-    from_str, many, not_followed_by, one_of, optional, parser,
+    many, not_followed_by, one_of, optional, parser,
     parser::{
         char::{self, char, digit, space},
         combinator::{no_partial, recognize, NotFollowedBy, Try},
@@ -56,6 +60,9 @@ use combine::{
     stream::{RangeStream, ResetStream, Stream, StreamOnce},
     token, unexpected, ErrorOffset, ParseError, ParseResult, Parser,
 };
+
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
 
 type Str<I> = Expected<
     With<TokensCmp<fn(char, char) -> bool, str::Chars<'static>, I>, Value<I, &'static str>>,
@@ -756,7 +763,7 @@ where
     I: Stream<Token = char>,
     I::Error: ParseError<I::Token, I::Range, I::Position>,
 {
-    from_str(recognize::<String, _, _>((
+    recognize::<String, _, _>((
         optional(token('-')),
         (token('.').and(skip_many1(digit())).map(|_| '0')).or((
             token('0').skip(not_followed_by(digit())).or((
@@ -771,7 +778,8 @@ where
             (one_of("eE".chars()), optional(one_of("+-".chars()))),
             skip_many1(digit()),
         )),
-    )))
+    ))
+    .and_then(|s| s.parse().map_err(StreamErrorFor::<I>::message_format))
     .expected("float")
 }
 
